@@ -34,15 +34,12 @@ const userSchema = new mongoose.Schema(
     address: {
       district: {
         type: String,
-        required: [true, "District is required"],
       },
       area: {
         type: String,
-        required: [true, "Area is required"],
       },
       houseNumber: {
         type: String,
-        required: [true, "House Number is required"],
       },
       additionalInformation: {
         type: String,
