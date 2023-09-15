@@ -1,5 +1,6 @@
 const RESPONSE_MESSAGE = {
     BLOCK_ACCOUNT: "Account has been blocked for next 5 minutes",
+    ACCOUNT_NOT_VERIFIED: "Account is not verified", 
     EMAIL_ALREADY_EXISTS: "Email already exists",
     EMAIL_DOESNT_EXIST: "Email doesn't exists",
     FAILED_TO_SIGNUP: "Failed to signup",

@@ -1,7 +1,8 @@
 const AuthModel = require("../models/auth_model");
+const AdminModel = require("../models/admin_models");
 const UserModel = require("../models/user_model");
 const { sendResponse } = require("../utils/common");
-const { generateUserToken } = require("../utils/token_handler");
+const { generateAdminToken, generateUserToken } = require("../utils/token_handler");
 const STATUS_CODE = require("../constants/status_codes");
 const STATUS_REPONSE = require("../constants/status_response");
 const RESPONSE_MESSAGE = require("../constants/response_message");
@@ -11,7 +12,7 @@ class AuthController {
   async signup(req, res) {
     try {
       const response = req.body;
-      let id, token;
+      let id, token, responseData;
 
       const isEmailExists = await AuthModel.findOne({ email: response.email });
       if (isEmailExists) {
@@ -23,7 +24,35 @@ class AuthController {
         );
       }
 
-      if (response.role === 2) {
+      if (response.role === 1) {
+        const admin = {
+          name: response.name,
+          role: response.role,
+          email: response.email,
+          secretId: response.secretId,
+          superAdmin: response.superAdmin,
+        };
+
+        const createdAdmin = await AdminModel.create(admin);
+        if (!createdAdmin) {
+          return sendResponse(
+            res,
+            STATUS_CODE.INTERNAL_SERVER_ERROR,
+            RESPONSE_MESSAGE.FAILED_TO_SIGNUP,
+            STATUS_REPONSE.INTERNAL_SERVER_ERROR
+          );
+        }
+
+        id = createdAdmin._id;
+        token = generateAdminToken(createdAdmin);
+        responseData = {
+          id: id,
+          email: response.email,
+          name: response.name,
+          secretId: response.secretId,
+          superAdmin: response.superAdmin,
+        };
+      } else if (response.role === 2) {
         const user = {
           name: response.name,
           role: response.role,
@@ -43,6 +72,12 @@ class AuthController {
 
         id = createdUser._id;
         token = generateUserToken(createdUser);
+        responseData = {
+          id: id,
+          email: response.email,
+          name: response.name,
+          phoneNumber: response.phoneNumber,
+        };
       }
 
       const hashedPassword = await bcrypt.hash(response.password, 10);
@@ -72,12 +107,7 @@ class AuthController {
         RESPONSE_MESSAGE.SIGNUP_SUCCESSFUL,
         {
           accessToken: token,
-          user: {
-            id: id,
-            email: response.email,
-            name: response.name,
-            phoneNumber: response.phoneNumber,
-          },
+          data: responseData,
         }
       );
     } catch (err) {
@@ -103,6 +133,15 @@ class AuthController {
           STATUS_CODE.NOT_FOUND,
           RESPONSE_MESSAGE.FAILED_TO_LOGIN,
           RESPONSE_MESSAGE.EMAIL_DOESNT_EXIST
+        );
+      }
+
+      if (!auth.verified) {
+        return sendResponse(
+          res,
+          STATUS_CODE.FORBIDDEN,
+          RESPONSE_MESSAGE.FAILED_TO_LOGIN,
+          RESPONSE_MESSAGE.ACCOUNT_NOT_VERIFIED
         );
       }
 

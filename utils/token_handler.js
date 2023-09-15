@@ -8,7 +8,7 @@ const generateAdminToken = (admin) => {
     {
       admin: {
         _id: admin.id,
-        securityKey: admin.securityKey,
+        email: admin.email,
         superAdmin: admin.superAdmin,
       },
       role: "admin",
