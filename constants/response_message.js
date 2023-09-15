@@ -10,7 +10,8 @@ const RESPONSE_MESSAGE = {
     INVALID_CREDENTIAL: "Invalid Credential",
     FAILED_TO_ADD_AUTHOR: "Failed to add author",
     AUTHOR_NAME_EXISTS: "Author with same name already exists",
-    AUTHOR_ADDED: "Author added successfully"
+    AUTHOR_ADDED: "Author added successfully",
+    GET_ALL_USERS: "Successfully get all users data"
 };
 
 module.exports = RESPONSE_MESSAGE;
