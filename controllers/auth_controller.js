@@ -2,7 +2,10 @@ const AuthModel = require("../models/auth_model");
 const AdminModel = require("../models/admin_models");
 const UserModel = require("../models/user_model");
 const { sendResponse } = require("../utils/common");
-const { generateAdminToken, generateUserToken } = require("../utils/token_handler");
+const {
+  generateAdminToken,
+  generateUserToken,
+} = require("../utils/token_handler");
 const STATUS_CODE = require("../constants/status_codes");
 const STATUS_REPONSE = require("../constants/status_response");
 const RESPONSE_MESSAGE = require("../constants/response_message");
@@ -126,7 +129,10 @@ class AuthController {
       const { email, password } = req.body;
       let responseData, token;
 
-      const auth = await AuthModel.findOne({ email }).populate("user").exec();
+      const auth = await AuthModel.findOne({ email })
+        .populate("admin")
+        .populate("user")
+        .exec();
       if (!auth) {
         return sendResponse(
           res,
@@ -184,7 +190,10 @@ class AuthController {
         );
       }
 
-      if (auth.role === 2) {
+      if (auth.role === 1) {
+        token = await generateAdminToken(auth.admin);
+        responseData = auth.admin;
+      } else if (auth.role === 2) {
         token = await generateUserToken(auth.user);
         responseData = auth.user;
       }
@@ -204,6 +213,7 @@ class AuthController {
             name: responseData.name,
             phoneNumber: responseData.phoneNumber,
             address: responseData.address,
+            superAdmin: responseData.superAdmin
           },
         }
       );
