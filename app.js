@@ -1,5 +1,6 @@
 const authRoutes = require("./routes/auth_routes.js");
 const { databaseConnection } = require("./config/database.js");
+const { sendResponse } = require("./utils/common.js");
 const express = require("express");
 const cors = require("cors");
 
@@ -13,8 +14,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/auth", authRoutes);
 
 app.use((req, res) => {
-  console.log("Not Found");
-  //return failure(res, 404, "Not Found", "Request Not Found");
+  return sendResponse(res, 404, "Not Found", "Request Not Found");
 });
 
 databaseConnection(() => {
