@@ -1,4 +1,5 @@
 const authRoutes = require("./routes/auth_routes.js");
+const authorRoutes = require("./routes/author_routes.js");
 const { databaseConnection } = require("./config/database.js");
 const { sendResponse } = require("./utils/common.js");
 const express = require("express");
@@ -12,6 +13,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/auth", authRoutes);
+app.use("/author", authorRoutes);
 
 app.use((req, res) => {
   return sendResponse(res, 404, "Not Found", "Request Not Found");

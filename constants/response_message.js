@@ -8,6 +8,9 @@ const RESPONSE_MESSAGE = {
     FAILED_TO_LOGIN: "Failed to Login",
     LOGIN_SUCCESSFUL: "Successfully login",
     INVALID_CREDENTIAL: "Invalid Credential",
+    FAILED_TO_ADD_AUTHOR: "Failed to add author",
+    AUTHOR_NAME_EXISTS: "Author with same name already exists",
+    AUTHOR_ADDED: "Author added successfully"
 };
 
 module.exports = RESPONSE_MESSAGE;
