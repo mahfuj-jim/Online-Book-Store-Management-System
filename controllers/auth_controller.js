@@ -1,24 +1,28 @@
 const AuthModel = require("../models/auth_model");
 const AdminModel = require("../models/admin_models");
 const UserModel = require("../models/user_model");
-const { sendResponse } = require("../utils/common");
+const { sendResponse, writeToLogFile } = require("../utils/common");
 const {
   generateAdminToken,
   generateUserToken,
+  decodeToken,
 } = require("../utils/token_handler");
 const STATUS_CODE = require("../constants/status_codes");
-const STATUS_REPONSE = require("../constants/status_response");
+const STATUS_RESPONSE = require("../constants/status_response");
 const RESPONSE_MESSAGE = require("../constants/response_message");
 const bcrypt = require("bcrypt");
 
 class AuthController {
   async signup(req, res) {
     try {
-      const response = req.body;
-      let id, token, responseData;
+      const requestBody = req.body;
+      let token, responseData;
 
-      const isEmailExists = await AuthModel.findOne({ email: response.email });
+      const isEmailExists = await AuthModel.findOne({
+        email: requestBody.email,
+      });
       if (isEmailExists) {
+        writeToLogFile("Error: Failed to Signup Email Already Exists");
         return sendResponse(
           res,
           STATUS_CODE.CONFLICT,
@@ -27,83 +31,99 @@ class AuthController {
         );
       }
 
-      if (response.role === 1) {
+      if (requestBody.role === 1) {
         const admin = {
-          name: response.name,
-          role: response.role,
-          email: response.email,
-          secretId: response.secretId,
-          superAdmin: response.superAdmin,
+          name: requestBody.name,
+          role: requestBody.role,
+          email: requestBody.email,
+          secretId: requestBody.secretId,
+          superAdmin: requestBody.superAdmin,
         };
 
         const createdAdmin = await AdminModel.create(admin);
         if (!createdAdmin) {
+          writeToLogFile("Error: Failed to Signup - Internal Server Error");
           return sendResponse(
             res,
             STATUS_CODE.INTERNAL_SERVER_ERROR,
             RESPONSE_MESSAGE.FAILED_TO_SIGNUP,
-            STATUS_REPONSE.INTERNAL_SERVER_ERROR
+            STATUS_RESPONSE.INTERNAL_SERVER_ERROR
           );
         }
 
-        id = createdAdmin._id;
         token = generateAdminToken(createdAdmin);
         responseData = {
-          id: id,
-          email: response.email,
-          name: response.name,
-          secretId: response.secretId,
-          superAdmin: response.superAdmin,
+          _id: createdAdmin._id,
+          email: requestBody.email,
+          name: requestBody.name,
+          secretId: requestBody.secretId,
+          superAdmin: requestBody.superAdmin,
         };
-      } else if (response.role === 2) {
+      } else if (requestBody.role === 2) {
+        const isPhoneNumberExists = await UserModel.findOne({
+          phoneNumber: requestBody.phoneNumber,
+        });
+        if (isPhoneNumberExists && isPhoneNumberExists.phoneNumber) {
+          writeToLogFile("Error: Failed to Signup - Phone Number Already Exists");
+          return sendResponse(
+            res,
+            STATUS_CODE.CONFLICT,
+            RESPONSE_MESSAGE.FAILED_TO_SIGNUP,
+            RESPONSE_MESSAGE.PHONE_NUMBER_ALREADY_EXISTS
+          );
+        }
+
         const user = {
-          name: response.name,
-          role: response.role,
-          email: response.email,
-          phoneNumber: response.phoneNumber,
+          name: requestBody.name,
+          role: requestBody.role,
+          email: requestBody.email,
+          phoneNumber: requestBody.phoneNumber,
         };
 
         const createdUser = await UserModel.create(user);
         if (!createdUser) {
+          
+        writeToLogFile("Error: Failed to Signup - Internal Server Error");
           return sendResponse(
             res,
             STATUS_CODE.INTERNAL_SERVER_ERROR,
             RESPONSE_MESSAGE.FAILED_TO_SIGNUP,
-            STATUS_REPONSE.INTERNAL_SERVER_ERROR
+            STATUS_RESPONSE.INTERNAL_SERVER_ERROR
           );
         }
 
-        id = createdUser._id;
         token = generateUserToken(createdUser);
         responseData = {
-          id: id,
-          email: response.email,
-          name: response.name,
-          phoneNumber: response.phoneNumber,
+          _id: createdUser._id,
+          email: requestBody.email,
+          name: requestBody.name,
+          phoneNumber: requestBody.phoneNumber,
         };
       }
 
-      const hashedPassword = await bcrypt.hash(response.password, 10);
+      const hashedPassword = await bcrypt.hash(requestBody.password, 10);
       const auth = {
-        email: response.email,
+        email: requestBody.email,
         password: hashedPassword,
         verified: true,
-        role: response.role,
-        admin: response.role === 1 ? id : null,
-        user: response.role === 2 ? id : null,
+        role: requestBody.role,
+        admin: requestBody.role === 1 ? responseData._id : null,
+        user: requestBody.role === 2 ? responseData._id : null,
         lastLoginDate: new Date(),
       };
 
       const createdAuth = await AuthModel.create(auth);
       if (!createdAuth) {
+        writeToLogFile("Error: Failed to Signup - Internal Server Error");
         return sendResponse(
           res,
           STATUS_CODE.INTERNAL_SERVER_ERROR,
           RESPONSE_MESSAGE.FAILED_TO_SIGNUP,
-          STATUS_REPONSE.INTERNAL_SERVER_ERROR
+          STATUS_RESPONSE.INTERNAL_SERVER_ERROR
         );
       }
-
+      
+      writeToLogFile("Signup: Successfull");
       return sendResponse(
         res,
         STATUS_CODE.CREATED,
@@ -114,12 +134,12 @@ class AuthController {
         }
       );
     } catch (err) {
-      console.log(err);
+      writeToLogFile("Error: Failed to Signup - Internal Server Error");
       return sendResponse(
         res,
         STATUS_CODE.INTERNAL_SERVER_ERROR,
         RESPONSE_MESSAGE.FAILED_TO_SIGNUP,
-        STATUS_REPONSE.INTERNAL_SERVER_ERROR
+        STATUS_RESPONSE.INTERNAL_SERVER_ERROR
       );
     }
   }
@@ -133,7 +153,8 @@ class AuthController {
         .populate("admin")
         .populate("user")
         .exec();
-      if (!auth) {
+      if (!auth) { 
+        writeToLogFile("Error: Failed to Login - Email Don't Exists");
         return sendResponse(
           res,
           STATUS_CODE.NOT_FOUND,
@@ -142,12 +163,13 @@ class AuthController {
         );
       }
 
-      if (!auth.verified) {
+      if (auth.disable) {
+        writeToLogFile("Error: Failed to Login - Auth is Disable");
         return sendResponse(
           res,
           STATUS_CODE.FORBIDDEN,
           RESPONSE_MESSAGE.FAILED_TO_LOGIN,
-          RESPONSE_MESSAGE.ACCOUNT_NOT_VERIFIED
+          RESPONSE_MESSAGE.ACCOUNT_DISABLE
         );
       }
 
@@ -155,6 +177,7 @@ class AuthController {
         const remainingTimeInSeconds = Math.ceil(
           (auth.blockUntil - new Date()) / 1000
         );
+        writeToLogFile("Error: Failed to Login - User is Blocked");
         return sendResponse(
           res,
           STATUS_CODE.UNAUTHORIZED,
@@ -168,11 +191,11 @@ class AuthController {
         auth.loginAttempts = (auth.loginAttempts || 0) + 1;
 
         if (auth.loginAttempts >= 5) {
-          // const blockUntil = new Date(Date.now() + 5 * 60 * 1000);
           auth.blockUntil = new Date(Date.now() + 5 * 60 * 1000);
           auth.loginAttempts = 0;
 
           await auth.save();
+          writeToLogFile("Error: Failed to Login - User Get Blocked");
           return sendResponse(
             res,
             STATUS_CODE.UNAUTHORIZED,
@@ -182,9 +205,10 @@ class AuthController {
         }
 
         await auth.save();
+        writeToLogFile("Error: Failed to Login - Invalid Credential");
         return sendResponse(
           res,
-          HTTP_STATUS.UNAUTHORIZED,
+          STATUS_CODE.UNAUTHORIZED,
           RESPONSE_MESSAGE.FAILED_TO_LOGIN,
           RESPONSE_MESSAGE.INVALID_CREDENTIAL
         );
@@ -201,6 +225,7 @@ class AuthController {
       auth.loginAttempts = 0;
       await auth.save();
 
+      writeToLogFile("Login: Successfully Login");
       return sendResponse(
         res,
         STATUS_CODE.OK,
@@ -208,22 +233,22 @@ class AuthController {
         {
           token: token,
           user: {
-            id: responseData._id,
+            _id: responseData._id,
             email: responseData.email,
             name: responseData.name,
             phoneNumber: responseData.phoneNumber,
             address: responseData.address,
-            superAdmin: responseData.superAdmin
+            superAdmin: responseData.superAdmin,
           },
         }
       );
     } catch (err) {
-      console.log(err);
+      writeToLogFile("Error: Failed to Login - Internal Server Error");
       return sendResponse(
         res,
         STATUS_CODE.INTERNAL_SERVER_ERROR,
-        RESPONSE_MESSAGE.FAILED_TO_SIGNUP,
-        STATUS_REPONSE.INTERNAL_SERVER_ERROR
+        RESPONSE_MESSAGE.FAILED_TO_LOGIN,
+        STATUS_RESPONSE.INTERNAL_SERVER_ERROR
       );
     }
   }

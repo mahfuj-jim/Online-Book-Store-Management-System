@@ -18,10 +18,6 @@ const authSchema = new mongoose.Schema(
             type: String,
             required: [true, "Password is not provided"]
         },
-        verified: {
-            type: Boolean,
-            required: [true, "Verified is not provided"],
-        },
         role: {
             type: Number,
             enum: [1, 2],
@@ -56,6 +52,10 @@ const authSchema = new mongoose.Schema(
         lastLoginDate: {
             type: Date,
             required: [true, "Last Login is not provided"],
+        },
+        disable: {
+            type: Boolean,
+            default: false,
         },
     },
     {
