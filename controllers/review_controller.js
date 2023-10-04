@@ -66,7 +66,6 @@ class ReviewController {
         disable: false,
       });
       if (!book) {
-        
         writeToLogFile("Error: Failed to Add Review - Book Don't Exists");
         return sendResponse(
           res,
@@ -249,6 +248,7 @@ class ReviewController {
 
       const isIdValid = mongoose.Types.ObjectId.isValid(reviewId);
       if (!isIdValid) {
+        console.log("Invalid");
         return sendResponse(
           res,
           STATUS_CODE.CONFLICT,
@@ -259,6 +259,7 @@ class ReviewController {
 
       const existingReview = await ReviewModel.findOne({ _id: reviewId });
       if (!existingReview) {
+        console.log(reviewId);
         return sendResponse(
           res,
           STATUS_CODE.CONFLICT,

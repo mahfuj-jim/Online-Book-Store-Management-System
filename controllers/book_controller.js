@@ -52,7 +52,7 @@ class BookController {
         }
       }
 
-      let books = await BookModel.aggregate([
+      let aggregatePipeline = [
         {
           $lookup: {
             from: "authors",
@@ -89,15 +89,20 @@ class BookController {
           },
         },
         {
-          $sort: sortStage,
-        },
-        {
           $skip: (page - 1) * limit,
         },
         {
           $limit: limit,
         },
-      ]);
+      ];
+
+      if (Object.keys(sortStage).length > 0) {
+        aggregationPipeline.push({
+          $sort: sortStage,
+        });
+      }
+
+      let books = await BookModel.aggregate(aggregatePipeline);
 
       books.map((book) => {
         bookIds.push(book._id);
