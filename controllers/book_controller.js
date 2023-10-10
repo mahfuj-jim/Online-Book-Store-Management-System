@@ -83,6 +83,7 @@ class BookController {
             price: 1,
             genre: 1,
             country: 1,
+            image: 1,
             "author._id": 1,
             "author.name": 1,
             "author.country": 1,
@@ -146,6 +147,8 @@ class BookController {
         .populate("author", "_id name about country")
         .exec();
 
+      console.log(book);
+
       const author = await AuthorModel.findOne({
         _id: book.author._id,
         disable: false,
@@ -186,6 +189,7 @@ class BookController {
       );
     } catch (err) {
       writeToLogFile("Error: Failed to Book by ID - Internal Server Error");
+      console.log(err);
       return sendResponse(
         res,
         STATUS_CODE.INTERNAL_SERVER_ERROR,

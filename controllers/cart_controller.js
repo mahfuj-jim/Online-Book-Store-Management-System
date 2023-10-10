@@ -37,7 +37,7 @@ class CartController {
       const cart = await CartModel.findOne({ user: userId })
         .populate({
           path: "orderList.book",
-          select: "_id title price author",
+          select: "_id title price author image genre",
           populate: {
             path: "author",
             select: "_id name",

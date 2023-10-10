@@ -48,8 +48,8 @@ const validateBookData = (req, res, next) => {
         errors.stock = "Stock must be a number greater than or equal to 1";
     }
 
-    if (totalSell && typeof totalSell !== "number" || totalSell < 1) {
-        errors.totalSell = "Total Sell must be a number greater than or equal to 1";
+    if (totalSell && typeof totalSell !== "number" || totalSell < 0) {
+        errors.totalSell = "Total Sell must be a number greater than or equal to 0";
     }
 
     if (!pageNumber) {
@@ -150,7 +150,7 @@ const validateUpdateBookData = (req, res, next) => {
         errors.pageNumber = "Page number must be a number greater than or equal to 1";
     }
 
-    if (totalSell && typeof totalSell !== "number" || totalSell < 1) {
+    if (totalSell && typeof totalSell !== "number" || totalSell < 0) {
         errors.totalSell = "Total Sell must be a number greater than or equal to 1";
     }
 
