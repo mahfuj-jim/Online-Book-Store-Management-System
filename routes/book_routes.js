@@ -5,6 +5,7 @@ const express = require("express");
 const router = express.Router();
 
 router.get("/all", BookController.getAllBooks);
+router.get("/all/admin", BookController.getAdminAllBooks);
 router.get("/:id", BookController.getBookById);
 router.post("/add", validateToken, validateBookData, BookController.addNewBook);
 router.put("/edit", validateToken, validateUpdateBookData, BookController.editBook);

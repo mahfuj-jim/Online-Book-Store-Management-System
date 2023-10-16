@@ -84,6 +84,7 @@ class BookController {
             genre: 1,
             country: 1,
             image: 1,
+            rating: 1,
             "author._id": 1,
             "author.name": 1,
             "author.country": 1,
@@ -98,7 +99,7 @@ class BookController {
       ];
 
       if (Object.keys(sortStage).length > 0) {
-        aggregationPipeline.push({
+        aggregatePipeline.push({
           $sort: sortStage,
         });
       }
@@ -115,11 +116,139 @@ class BookController {
       const discounts = await DiscountModel.find(query);
       const booksWithDiscounts = countBookDiscount(books, discounts);
 
+      const totalBooks = await BookModel.find({disable: false}).count();
+
       writeToLogFile("Get All Books: Successfully Get All Books");
       return sendResponse(res, STATUS_CODE.OK, RESPONSE_MESSAGE.GET_ALL_BOOKS, {
         page: page,
         bookPerPage: limit,
         totalBooks: booksWithDiscounts.length,
+        totalPages: Math.ceil(totalBooks / limit),
+        books: booksWithDiscounts,
+      });
+    } catch (err) {
+      console.log(err);
+      writeToLogFile("Error: Failed to Get All Books - Internal Server Error");
+      return sendResponse(
+        res,
+        STATUS_CODE.INTERNAL_SERVER_ERROR,
+        RESPONSE_MESSAGE.FAILED_TO_GET_BOOKS,
+        STATUS_RESPONSE.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  async getAdminAllBooks(req, res) {
+    try {
+      const { sortProperty } = req.query;
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const sortOrder = req.query.sortOrder || "asc";
+      const genreFilter = req.query.genreFilter || "";
+      const searchKey = req.query.searchKey || "";
+      let bookIds = [];
+      let authorIds = [];
+      let uniqueAuthors = new Set();
+      let sortStage = {};
+
+      if (sortProperty) {
+        if (
+          sortProperty !== "price" ||
+          sortProperty !== "rating" ||
+          sortProperty !== "stock" ||
+          sortProperty !== "totalSell" ||
+          sortOrder !== "asc" ||
+          sortOrder !== "desc"
+        ) {
+          if (sortOrder === "desc") {
+            sortStage[sortProperty] = -1;
+          } else {
+            sortStage[sortProperty] = 1;
+          }
+        } else {
+          writeToLogFile(
+            "Error: Failed to Get All Books - Invalid Sort Property"
+          );
+          return sendResponse(
+            res,
+            STATUS_CODE.UNPROCESSABLE_ENTITY,
+            RESPONSE_MESSAGE.FAILED_TO_GET_BOOKS,
+            RESPONSE_MESSAGE.INVALID_SORT_PROPERTY
+          );
+        }
+      }
+
+      let aggregatePipeline = [
+        {
+          $lookup: {
+            from: "authors",
+            localField: "author",
+            foreignField: "_id",
+            as: "author",
+          },
+        },
+        {
+          $unwind: "$author",
+        },
+        {
+          $match: {
+            $or: [
+              { title: { $regex: searchKey, $options: "i" } },
+              { "author.name": { $regex: searchKey, $options: "i" } },
+            ],
+            genre: { $regex: genreFilter, $options: "i" },
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            title: 1,
+            price: 1,
+            genre: 1,
+            country: 1,
+            image: 1,
+            rating: 1,
+            disable: 1,
+            totalSell: 1,
+            "author._id": 1,
+            "author.name": 1,
+            "author.country": 1,
+          },
+        },
+        {
+          $skip: (page - 1) * limit,
+        },
+        {
+          $limit: limit,
+        },
+      ];
+
+      if (Object.keys(sortStage).length > 0) {
+        aggregatePipeline.push({
+          $sort: sortStage,
+        });
+      }
+
+      let books = await BookModel.aggregate(aggregatePipeline);
+
+      books.map((book) => {
+        bookIds.push(book._id);
+        uniqueAuthors.add(book.author._id);
+      });
+      authorIds = Array.from(uniqueAuthors);
+
+      const query = discountQuery(bookIds, authorIds);
+      const discounts = await DiscountModel.find(query);
+      const booksWithDiscounts = countBookDiscount(books, discounts);
+
+      const totalBooks = await BookModel.find().count();
+
+      writeToLogFile("Get All Books: Successfully Get All Books");
+      return sendResponse(res, STATUS_CODE.OK, RESPONSE_MESSAGE.GET_ALL_BOOKS, {
+        page: page,
+        bookPerPage: limit,
+        totalBooks: booksWithDiscounts.length,
+        totalPages: Math.ceil(totalBooks / limit),
         books: booksWithDiscounts,
       });
     } catch (err) {

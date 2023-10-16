@@ -5,12 +5,20 @@ const { sendResponse, writeToLogFile } = require("../utils/common");
 const {
   generateAdminToken,
   generateUserToken,
-  decodeToken,
 } = require("../utils/token_handler");
+const { transport } = require("../config/mail");
 const STATUS_CODE = require("../constants/status_codes");
 const STATUS_RESPONSE = require("../constants/status_response");
 const RESPONSE_MESSAGE = require("../constants/response_message");
 const bcrypt = require("bcrypt");
+const ejs = require("ejs");
+const { promisify } = require("util");
+const ejsRenderFile = promisify(ejs.renderFile);
+const crypto = require("crypto");
+const path = require("path");
+const dotenv = require("dotenv");
+
+dotenv.config();
 
 class AuthController {
   async signup(req, res) {
@@ -64,7 +72,9 @@ class AuthController {
           phoneNumber: requestBody.phoneNumber,
         });
         if (isPhoneNumberExists && isPhoneNumberExists.phoneNumber) {
-          writeToLogFile("Error: Failed to Signup - Phone Number Already Exists");
+          writeToLogFile(
+            "Error: Failed to Signup - Phone Number Already Exists"
+          );
           return sendResponse(
             res,
             STATUS_CODE.CONFLICT,
@@ -82,8 +92,7 @@ class AuthController {
 
         const createdUser = await UserModel.create(user);
         if (!createdUser) {
-          
-        writeToLogFile("Error: Failed to Signup - Internal Server Error");
+          writeToLogFile("Error: Failed to Signup - Internal Server Error");
           return sendResponse(
             res,
             STATUS_CODE.INTERNAL_SERVER_ERROR,
@@ -122,7 +131,7 @@ class AuthController {
           STATUS_RESPONSE.INTERNAL_SERVER_ERROR
         );
       }
-      
+
       writeToLogFile("Signup: Successfull");
       return sendResponse(
         res,
@@ -153,7 +162,7 @@ class AuthController {
         .populate("admin")
         .populate("user")
         .exec();
-      if (!auth) { 
+      if (!auth) {
         writeToLogFile("Error: Failed to Login - Email Don't Exists");
         return sendResponse(
           res,
@@ -232,6 +241,7 @@ class AuthController {
         RESPONSE_MESSAGE.LOGIN_SUCCESSFUL,
         {
           token: token,
+          role: auth.role,
           user: {
             _id: responseData._id,
             email: responseData.email,
@@ -248,6 +258,224 @@ class AuthController {
         res,
         STATUS_CODE.INTERNAL_SERVER_ERROR,
         RESPONSE_MESSAGE.FAILED_TO_LOGIN,
+        STATUS_RESPONSE.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  async sendForgetPasswordEmail(req, res) {
+    try {
+      const { email } = req.body;
+      if (!email || email == "") {
+        return sendResponse(
+          res,
+          STATUS_CODE.UNPROCESSABLE_ENTITY,
+          RESPONSE_MESSAGE.FAILED_TO_FORGETPASSWORD,
+          STATUS_RESPONSE.UNPROCESSABLE_ENTITY
+        );
+      }
+
+      const auth = await AuthModel.findOne({ email })
+        .populate("admin")
+        .populate("user")
+        .exec();
+      if (!auth) {
+        writeToLogFile("Error: Failed to Forget Password - Email Don't Exists");
+        return sendResponse(
+          res,
+          STATUS_CODE.NOT_FOUND,
+          RESPONSE_MESSAGE.FAILED_TO_FORGETPASSWORD,
+          RESPONSE_MESSAGE.EMAIL_DOESNT_EXIST
+        );
+      }
+
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      auth.resetPasswordToken = resetToken;
+      auth.resetPasswordExpire = Date.now() + 60 * 60 * 1000;
+      auth.resetPassword = true;
+
+      await auth.save();
+
+      const resetUrl = path.join(
+        process.env.FRONTEND_URL,
+        "reset-password",
+        resetToken,
+        auth.user ? auth.user._id.toString() : auth.admin._id.toString()
+      );
+
+      const htmlBody = await ejsRenderFile(
+        path.join(__dirname, "..", "views", "forget-password.ejs"),
+        {
+          name: auth.user ? auth.user.name : auth.admin.name,
+          resetUrl: resetUrl,
+        }
+      );
+
+      const result = await transport.sendMail({
+        from: "online.bookstore@gmail.com",
+        to: `${auth.name} ${email}`,
+        subject: "Forget Password",
+        html: htmlBody,
+      });
+
+      if (result.messageId) {
+        return sendResponse(
+          res,
+          STATUS_CODE.OK,
+          RESPONSE_MESSAGE.FORGETPASSWORD_SUCCESSFUL,
+          STATUS_RESPONSE.OK
+        );
+      } else {
+        return sendResponse(
+          res,
+          STATUS_CODE.UNPROCESSABLE_ENTITY,
+          RESPONSE_MESSAGE.FAILED_TO_FORGETPASSWORD,
+          STATUS_RESPONSE.UNPROCESSABLE_ENTITY
+        );
+      }
+    } catch (err) {
+      console.log(err);
+      writeToLogFile(
+        "Error: Failed to Send Forget Password Email - Internal Server Error"
+      );
+      return sendResponse(
+        res,
+        STATUS_CODE.INTERNAL_SERVER_ERROR,
+        RESPONSE_MESSAGE.FAILED_TO_FORGETPASSWORD,
+        STATUS_RESPONSE.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  async resetPassword(req, res) {
+    try {
+      const { token, userId, newPassword, confirmPassword } = req.body;
+
+      if (
+        !newPassword ||
+        newPassword === "" ||
+        !confirmPassword ||
+        confirmPassword === ""
+      ) {
+        return sendResponse(
+          res,
+          STATUS_CODE.NOT_FOUND,
+          RESPONSE_MESSAGE.FAILED_TO_FORGETPASSWORD,
+          "Password and Confrim Password is required"
+        );
+      } else if (
+        !/^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[!@#$%^&*])[A-Za-z0-9!@#$%^&*]{8,}$/.test(
+          newPassword
+        )
+      ) {
+        return sendResponse(
+          res,
+          STATUS_CODE.NOT_FOUND,
+          RESPONSE_MESSAGE.FAILED_TO_FORGETPASSWORD,
+          "Password must be at least 8 characters long and include at least one capital letter, one small letter, one special character, and one number."
+        );
+      }
+
+      if (newPassword !== confirmPassword) {
+        return sendResponse(
+          res,
+          STATUS_CODE.NOT_FOUND,
+          RESPONSE_MESSAGE.FAILED_TO_FORGETPASSWORD,
+          "Password and confirm passsword is not matched"
+        );
+      }
+
+      const auth = await AuthModel.findOne({
+        $or: [{ user: userId }, { admin: userId }],
+      });
+
+      if (!auth) {
+        return sendResponse(
+          res,
+          STATUS_CODE.NOT_FOUND,
+          RESPONSE_MESSAGE.FAILED_TO_FORGETPASSWORD,
+          STATUS_RESPONSE.USER_NOT_FOUND
+        );
+      }
+
+      const isPreviousPassword = await bcrypt.compare(
+        newPassword,
+        auth.password
+      );
+      if (isPreviousPassword) {
+        return sendResponse(
+          res,
+          STATUS_CODE.NOT_FOUND,
+          RESPONSE_MESSAGE.FAILED_TO_FORGETPASSWORD,
+          "Previous Password"
+        );
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      auth.password = hashedPassword;
+      auth.resetPasswordToken = null;
+      auth.resetPasswordExpire = null;
+      auth.resetPassword = false;
+
+      await auth.save();
+
+      return sendResponse(res, STATUS_CODE.OK, STATUS_RESPONSE.OK);
+    } catch (err) {
+      return sendResponse(
+        res,
+        STATUS_CODE.INTERNAL_SERVER_ERROR,
+        RESPONSE_MESSAGE.FAILED_TO_FORGETPASSWORD,
+        STATUS_RESPONSE.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  async validatePasswordRequest(req, res) {
+    console.log(req);
+    try {
+      const { token, userId } = req.query;
+      console.log(userId, token);
+
+      const auth = await AuthModel.findOne({
+        $or: [{ user: userId }, { admin: userId }],
+      });
+      if (!auth) {
+        return sendResponse(
+          res,
+          STATUS_CODE.NOT_FOUND,
+          RESPONSE_MESSAGE.FAILED_TO_FORGETPASSWORD,
+          STATUS_RESPONSE.USER_NOT_FOUND
+        );
+      }
+
+      if (auth.resetPasswordToken !== token || auth.resetPassword === false) {
+        return sendResponse(
+          res,
+          STATUS_CODE.GONE,
+          RESPONSE_MESSAGE.FAILED_TO_FORGETPASSWORD,
+          "Request is not valid"
+        );
+      }
+
+      if (auth.resetPasswordExpire < Date.now()) {
+        return sendResponse(
+          res,
+          STATUS_CODE.FORBIDDEN,
+          RESPONSE_MESSAGE.FAILED_TO_FORGETPASSWORD,
+          STATUS_RESPONSE.GONE
+        );
+      }
+
+      return sendResponse(res, STATUS_CODE.OK, STATUS_RESPONSE.OK);
+    } catch (err) {
+      writeToLogFile(
+        "Error: Failed to Send Forget Password Email - Internal Server Error"
+      );
+      return sendResponse(
+        res,
+        STATUS_CODE.INTERNAL_SERVER_ERROR,
+        RESPONSE_MESSAGE.FAILED_TO_FORGETPASSWORD,
         STATUS_RESPONSE.INTERNAL_SERVER_ERROR
       );
     }

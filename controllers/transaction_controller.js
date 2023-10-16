@@ -28,7 +28,16 @@ class TransactionController {
         );
       }
 
-      const transactions = await TransactionModel.find();
+      const transactions = await TransactionModel.find()
+        .populate({
+          path: "orderList.book",
+          select: "_id title",
+        })
+        .populate({
+          path: "user",
+          select: "_id name",
+        })
+        .exec();
 
       writeToLogFile("Get All Transactions: Successfull");
       return sendResponse(
@@ -41,6 +50,7 @@ class TransactionController {
       writeToLogFile(
         "Error: Failed to Get All Transactions - Internal Server Error"
       );
+      console.log(err);
       return sendResponse(
         res,
         STATUS_CODE.INTERNAL_SERVER_ERROR,
@@ -69,7 +79,16 @@ class TransactionController {
         );
       }
 
-      const transactions = await TransactionModel.find({ user: userId });
+      const transactions = await TransactionModel.find({ user: userId })
+        .populate({
+          path: "orderList.book",
+          select: "_id title",
+        })
+        .populate({
+          path: "user",
+          select: "_id name",
+        })
+        .exec();
 
       writeToLogFile("Get User Transactions: Successfull");
       return sendResponse(
@@ -125,21 +144,21 @@ class TransactionController {
         );
       }
 
-      if (
-        !user.phoneNumber ||
-        !user.address ||
-        !user.address.district ||
-        !user.address.area ||
-        !user.address.houseNumber
-      ) {
-        writeToLogFile("Error: Failed to Create Transaction - Invalid Data");
-        return sendResponse(
-          res,
-          STATUS_CODE.NOT_FOUND,
-          RESPONSE_MESSAGE.FAILED_TO_CREATE_TRANSACTION,
-          RESPONSE_MESSAGE.PHONE_NUMBER_AND_ADDRESS_NEED_FOR_TRANSACTION
-        );
-      }
+      // if (
+      //   !user.phoneNumber ||
+      //   !user.address ||
+      //   !user.address.district ||
+      //   !user.address.area ||
+      //   !user.address.houseNumber
+      // ) {
+      //   writeToLogFile("Error: Failed to Create Transaction - Invalid Data");
+      //   return sendResponse(
+      //     res,
+      //     STATUS_CODE.NOT_FOUND,
+      //     RESPONSE_MESSAGE.FAILED_TO_CREATE_TRANSACTION,
+      //     RESPONSE_MESSAGE.PHONE_NUMBER_AND_ADDRESS_NEED_FOR_TRANSACTION
+      //   );
+      // }
 
       const cart = await CartModel.findOne({ user: userId })
         .populate({

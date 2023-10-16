@@ -20,5 +20,8 @@ router.post("/signup", (req, res, next) => {
     }
 }, AuthController.signup);
 router.post("/login", validateLogin, AuthController.login);
+router.post("/forgetpassword/email", AuthController.sendForgetPasswordEmail);
+router.post("/forgetpassword/reset", AuthController.resetPassword);
+router.get("/forgetpassword/validate", AuthController.validatePasswordRequest);
 
 module.exports = router;

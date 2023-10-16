@@ -8,6 +8,8 @@ const RESPONSE_MESSAGE = {
     EMAIL_DOESNT_EXIST: "Email doesn't exists",
     FAILED_TO_SIGNUP: "Failed to signup",
     SIGNUP_SUCCESSFUL: "Successfully signup",
+    FORGETPASSWORD_SUCCESSFUL: "Successfully send email for reset passwrd",
+    FAILED_TO_FORGETPASSWORD: "Failed to Reset Password",
     FAILED_TO_LOGIN: "Failed to Login",
     LOGIN_SUCCESSFUL: "Successfully login",
     INVALID_CREDENTIAL: "Invalid Credential",
