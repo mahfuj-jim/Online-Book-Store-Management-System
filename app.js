@@ -40,6 +40,8 @@ app.use("/api/review", reviewRoutes);
 app.use("/api/transaction", transactionRoutes);
 app.use("/api/user", userRoutes);
 
+app.use(express.static("server"));
+
 app.use((req, res) => {
   return sendResponse(res, 404, "Not Found", "Request Not Found");
 });

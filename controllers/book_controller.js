@@ -1,6 +1,7 @@
 const AuthorModel = require("../models/author_model");
 const BookModel = require("../models/book_model");
 const DiscountModel = require("../models/discount_model");
+const fileTypes = require("../constants/file_types");
 const {
   sendResponse,
   writeToLogFile,
@@ -116,7 +117,7 @@ class BookController {
       const discounts = await DiscountModel.find(query);
       const booksWithDiscounts = countBookDiscount(books, discounts);
 
-      const totalBooks = await BookModel.find({disable: false}).count();
+      const totalBooks = await BookModel.find({ disable: false }).count();
 
       writeToLogFile("Get All Books: Successfully Get All Books");
       return sendResponse(res, STATUS_CODE.OK, RESPONSE_MESSAGE.GET_ALL_BOOKS, {
@@ -330,7 +331,34 @@ class BookController {
 
   async addNewBook(req, res) {
     try {
-      const requestBody = req.body;
+      let requestBody = req.body;
+
+      if (!req.file) {
+        writeToLogFile("Error: Failed to Add Book - Book Image not provided");
+        return sendResponse(
+          res,
+          STATUS_CODE.BAD_REQUEST,
+          RESPONSE_MESSAGE.FAILED_TO_ADD_BOOK,
+          "Book Image not provided"
+        );
+      }
+
+      console.log(req.file_extension);
+
+      if (!fileTypes.includes(req.file_extension)) {
+        return sendResponse(
+          res,
+          STATUS_CODE.NOT_FOUND,
+          "Only .jpg, .png, .jpeg format allow"
+        );
+      }
+
+      requestBody.price = parseFloat(requestBody.price);
+      requestBody.stock = parseInt(requestBody.edition);
+      requestBody.edition = parseInt(requestBody.edition);
+      requestBody.pageNumber = parseInt(requestBody.pageNumber);
+      requestBody.genre = [requestBody.genre];
+      requestBody.image = req.file.path.replace(/\\/g, "/");
 
       const book = await BookModel.findOne({ ISBN: requestBody.ISBN });
       if (book) {
@@ -373,6 +401,7 @@ class BookController {
         createdBook
       );
     } catch (err) {
+      console.log(err);
       writeToLogFile("Error: Failed to Add Book - Internal Server Error");
       return sendResponse(
         res,

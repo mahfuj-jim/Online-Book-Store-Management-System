@@ -6,8 +6,15 @@ const RESPONSE_MESSAGE = require("../constants/response_message");
 const mongoose = require("mongoose");
 
 const validateBookData = (req, res, next) => {
-    const { title, author, price, stock, edition, totalSell, ISBN, pageNumber, country, language, genre, summary } = req.body;
+    console.log(req.body);
+    let { title, author, price, stock, edition, totalSell, ISBN, pageNumber, country, language, genre, summary } = req.body;
     const errors = {};
+
+    price = parseFloat(price);
+    stock = parseInt(edition);
+    edition = parseInt(edition);
+    pageNumber = parseInt(pageNumber);
+    genre = [genre];
 
     const decodedToken = decodeToken(req);
     if (decodedToken.role !== "admin") {
